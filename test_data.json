@@ -1,0 +1,18 @@
+{
+    "TransactionId": "T_TEST_001",
+    "BatchId": "B_TEST_001",
+    "AccountId": "A_TEST_001",
+    "SubscriptionId": "S_TEST_001",
+    "CustomerId": "C_TEST_001",
+    "CurrencyCode": "UGX",
+    "CountryCode": 256,
+    "ProviderId": "P1",
+    "ProductId": "ProdA",
+    "ProductCategory": "airtime",
+    "ChannelId": "ChannelId_3",
+    "Amount": 1500.0,
+    "Value": 1500,
+    "TransactionStartTime": "2024-07-03T15:30:00Z",
+    "PricingStrategy": 2,
+    "FraudResult": 0
+}

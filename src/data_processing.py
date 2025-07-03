@@ -19,6 +19,10 @@ class DateTimeExtractor(BaseEstimator, TransformerMixin):
         X_copy['transaction_day_of_week'] = X_copy[self.time_column].dt.dayofweek
         X_copy['transaction_month'] = X_copy[self.time_column].dt.month
         X_copy['transaction_year'] = X_copy[self.time_column].dt.year
+        
+        # --- NEW: Drop the original TransactionStartTime column ---
+        X_copy = X_copy.drop(columns=[self.time_column], errors='ignore')
+        
         return X_copy
 
 class AmountHandler(BaseEstimator, TransformerMixin):
@@ -99,63 +103,3 @@ if __name__ == "__main__":
         print("\nCould not retrieve all feature names easily from the transformed array.")
 
     print("\nData processing pipeline test complete.")
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import MinMaxScaler # For scaling RFM features
-
-def generate_proxy_target(df_processed, snapshot_date=None, n_clusters=3, random_state=42):
-    """
-    Generates a proxy target variable 'is_high_risk' based on RFM analysis and K-Means clustering.
-
-    Args:
-        df_processed (pd.DataFrame): The DataFrame after initial feature engineering,
-                                     containing 'CustomerId', 'TransactionStartTime', 'Value'.
-        snapshot_date (datetime, optional): The date to calculate Recency from.
-                                            If None, uses the latest transaction date in the data.
-        n_clusters (int): Number of clusters for K-Means.
-        random_state (int): Random state for K-Means reproducibility.
-
-    Returns:
-        pd.DataFrame: A DataFrame with 'CustomerId' and the 'is_high_risk' proxy target.
-    """
-    if not pd.api.types.is_datetime64_any_dtype(df_processed['TransactionStartTime']):
-        df_processed['TransactionStartTime'] = pd.to_datetime(df_processed['TransactionStartTime'], errors='coerce', utc=True)
-    if snapshot_date is None:
-        snapshot_date = df_processed['TransactionStartTime'].max() + pd.Timedelta(days=1)
-
-    rfm_r = df_processed.groupby('CustomerId')['TransactionStartTime'].max().apply(lambda x: (snapshot_date - x).days)
-
-    
-    rfm_f = df_processed.groupby('CustomerId').size()
-
-
-    rfm_m = df_processed.groupby('CustomerId')['Value'].sum()
-
-
-    rfm_df = pd.DataFrame({
-        'Recency': rfm_r,
-        'Frequency': rfm_f,
-        'Monetary': rfm_m
-    })
-
-    rfm_df = rfm_df.replace([np.inf, -np.inf], np.nan).dropna()
-    rfm_df = rfm_df[rfm_df['Monetary'] >= 0]
-
-    scaler = MinMaxScaler()
-    rfm_scaled = scaler.fit_transform(rfm_df[['Recency', 'Frequency', 'Monetary']])
-    rfm_scaled_df = pd.DataFrame(rfm_scaled, columns=['Recency_Scaled', 'Frequency_Scaled', 'Monetary_Scaled'], index=rfm_df.index)
-
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10) 
-    rfm_scaled_df['Cluster'] = kmeans.fit_predict(rfm_scaled_df)
-
-    cluster_means = rfm_scaled_df.groupby('Cluster')[['Recency_Scaled', 'Frequency_Scaled', 'Monetary_Scaled']].mean()
-    print("\nRFM Cluster Means (Scaled):")
-    print(cluster_means)
-
-    cluster_means['Risk_Score'] = cluster_means['Recency_Scaled'] - cluster_means['Frequency_Scaled'] - cluster_means['Monetary_Scaled']
-    high_risk_cluster_id = cluster_means['Risk_Score'].idxmax()
-
-    print(f"\nIdentified high-risk cluster (based on Risk_Score heuristic): {high_risk_cluster_id}")
-
-    rfm_scaled_df['is_high_risk'] = (rfm_scaled_df['Cluster'] == high_risk_cluster_id).astype(int)
-
-    return rfm_scaled_df[['is_high_risk']]
